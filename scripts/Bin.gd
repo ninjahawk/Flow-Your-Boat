@@ -43,6 +43,8 @@ func _process(delta: float) -> void:
 		if _disable_timer <= 0.0:
 			is_disabled = false
 			dirty = true
+		else:
+			dirty = true  # redraw every frame for countdown
 
 	if _pulse > 0.0:
 		_pulse = maxf(_pulse - delta * 4.0, 0.0)
@@ -128,6 +130,17 @@ func _draw() -> void:
 		var fc2 := Color(1.0, 0.12, 0.12) if not _pulse_ok else Color(1.0, 1.0, 1.0)
 		fc2.a = _pulse * 0.22
 		Palette.draw_rrect(self, rect, CR, fc2)
+
+	# ---- Disabled countdown ----
+	if is_disabled and _disable_timer > 0.0:
+		var secs_left : int = int(ceilf(_disable_timer))
+		var font      := ThemeDB.fallback_font
+		var warn      := secs_left <= 3 and sin(_t * 8.0) > 0.0
+		var cd_col    := Color(1.0, 0.28, 0.28) if warn else Color(1.0, 1.0, 1.0, 0.55)
+		draw_string(font,
+			Vector2(-bin_width * 0.5, bin_height * 0.25),
+			str(secs_left),
+			HORIZONTAL_ALIGNMENT_CENTER, bin_width, 30, cd_col)
 
 # ================================================================
 #  PUBLIC API

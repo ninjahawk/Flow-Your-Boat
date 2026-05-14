@@ -24,6 +24,7 @@ var _active_per_lane: Array[int]  = []   # how many items currently in-flight pe
 
 var _last_tap_pos  := Vector2(-999.0, -999.0)
 var _last_tap_time := -1.0
+var _draw_t:       float = 0.0   # for _draw() animations
 
 const FlowItemScript   := preload("res://scripts/FlowItem.gd")
 const GateScript       := preload("res://scripts/Gate.gd")
@@ -80,9 +81,8 @@ func _input(event: InputEvent) -> void:
 	_last_tap_pos  = tap_vp
 	_last_tap_time = now
 
+	# Game over screen handles restart via its own button — don't restart on any tap here
 	if not GameState.is_running:
-		_on_restart()
-		get_viewport().set_input_as_handled()
 		return
 
 	if tap_vp.y >= GATE_Y - 60.0 and tap_vp.y <= GATE_Y + 60.0:
@@ -122,6 +122,34 @@ func _draw() -> void:
 		var bin_top := BIN_Y - BIN_H * 0.5
 		draw_line(Vector2(gx, gbot), Vector2(lbx, bin_top), gc, 1.0)
 		draw_line(Vector2(gx, gbot), Vector2(rbx, bin_top), gc, 1.0)
+
+	# Speed lines: drawn in lane when a RUSH item is present
+	_draw_speed_lines(n, lane_w)
+
+func _draw_speed_lines(n: int, lane_w: float) -> void:
+	# Check each lane for RUSH items
+	for child in _items.get_children():
+		var item := child as Node2D
+		if not is_instance_valid(item):
+			continue
+		if item.get("item_type") != FlowItem.Type.RUSH:
+			continue
+		if item.get("_state") != 0:
+			continue
+		var li: int = item.get("lane_index")
+		var lx := LANE_MARGIN + (float(li) + 0.5) * lane_w
+		var col := Palette.ITEM_COLORS[item.get("color_id") as int]
+		col.a = 0.18
+		# 4 vertical streaks at different offsets, scrolling fast
+		for s in range(4):
+			var offset_x := lx + float(s - 1.5) * (lane_w * 0.18)
+			var speed_y  := _draw_t * 680.0 + float(s) * 74.0
+			var streak_y := fmod(speed_y, 680.0) + LANE_TOP
+			var streak_len := 35.0 + float(s) * 12.0
+			draw_line(
+				Vector2(offset_x, streak_y),
+				Vector2(offset_x, minf(streak_y + streak_len, GATE_Y - 8.0)),
+				col, 2.0)
 
 func _setup_camera() -> void:
 	_camera = $Camera2D
@@ -199,6 +227,8 @@ func _init_spawn_timers() -> void:
 		_active_per_lane.append(0)
 
 func _process(delta: float) -> void:
+	_draw_t += delta
+	_check_redraw()
 	_update_background()
 	if not GameState.is_running:
 		return
@@ -208,6 +238,13 @@ func _process(delta: float) -> void:
 		if _spawn_timers[i] <= 0.0 and active < GameState.max_per_lane:
 			_spawn_item(i)
 			_spawn_timers[i] = GameState.spawn_interval
+
+func _check_redraw() -> void:
+	# Redraw static layer when RUSH items are in flight (animated speed lines)
+	for child in _items.get_children():
+		if child.get("item_type") == FlowItem.Type.RUSH and child.get("_state") == 0:
+			queue_redraw()
+			return
 
 func _update_background() -> void:
 	if not is_instance_valid(_bg):
@@ -273,15 +310,15 @@ func _on_item_reached_gate(item: FlowItem) -> void:
 	gate.set_active(false)
 
 func _on_item_reached_bin(item: FlowItem, bin_idx: int) -> void:
-	var bin      : Bin  = _bins[bin_idx]
-	var is_drain : bool = item.item_type == FlowItem.Type.DRAIN
-	var success  : bool = bin.receive_item(item.color_id, is_drain)
-	var lane_idx : int  = item.lane_index
+	var bin          : Bin  = _bins[bin_idx]
+	var is_drain     : bool = item.item_type == FlowItem.Type.DRAIN
+	var was_disabled : bool = bin.is_disabled
+	var success      : bool = bin.receive_item(item.color_id, is_drain)
+	var lane_idx     : int  = item.lane_index
 
 	if success:
 		GameState.increment_combo()
 		var base_pts := 10 + (GameState.combo - 1) * 5
-		# Bonus for special types
 		match item.item_type:
 			FlowItem.Type.RUSH:  base_pts = int(base_pts * 1.5)
 			FlowItem.Type.BOMB:  base_pts = int(base_pts * 2.0)
@@ -295,7 +332,6 @@ func _on_item_reached_bin(item: FlowItem, bin_idx: int) -> void:
 			Input.vibrate_handheld(20)
 	else:
 		GameState.reset_combo()
-		# BOMB wrong sort — extra consequences handled in Bin + here
 		var shake_amt := 8.0 if item.item_type == FlowItem.Type.BOMB else 6.0
 		Effects.screen_shake(shake_amt, 0.28)
 		Effects.shatter_at(item.global_position, Palette.ITEM_COLORS[item.color_id])
@@ -303,11 +339,18 @@ func _on_item_reached_bin(item: FlowItem, bin_idx: int) -> void:
 		if _audio: _audio.play_fail()
 		if OS.get_name() == "Android":
 			Input.vibrate_handheld(80)
-		# BOMB disables the bin it landed in
+
+		# BOMB: force-overflow the bin (if not already overflowed by receive_item)
 		if item.item_type == FlowItem.Type.BOMB:
-			bin._trigger_overflow()
+			if not bin.is_disabled:
+				bin._trigger_overflow()
+			# Overflow signal already handles lose_life — don't double-penalise
 		else:
-			GameState.lose_life()
+			# Only lose a life from wrong sort if overflow wasn't already triggered
+			if bin.is_disabled and not was_disabled:
+				pass  # overflow inside receive_item already fired lose_life via signal
+			else:
+				GameState.lose_life()
 
 	var timer := get_tree().create_timer(0.18)
 	timer.timeout.connect(item.queue_free)

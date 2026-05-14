@@ -41,7 +41,7 @@ func _process(delta: float) -> void:
 			_shots_done[st] = true
 			_screenshot("shot_%.0f.png" % st)
 
-	if _think_timer >= THINK_INTERVAL and _t > 0.8:
+	if _think_timer >= THINK_INTERVAL and _t > 0.8 and GameState.is_running:
 		_think_timer = 0.0
 		if SMART_MODE:
 			_play_smart()

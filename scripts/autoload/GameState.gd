@@ -129,6 +129,7 @@ func add_score(points: int) -> void:
 	# Check milestones
 	while _next_milestone_idx < MILESTONES.size() and score >= MILESTONES[_next_milestone_idx]:
 		score_milestone.emit(MILESTONES[_next_milestone_idx])
+		SaveData.submit(score)   # persist partial run progress at every milestone
 		_next_milestone_idx += 1
 
 func increment_combo() -> void:
