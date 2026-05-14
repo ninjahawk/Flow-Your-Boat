@@ -136,27 +136,61 @@ func _start_danger_pulse() -> void:
 func _on_combo_changed(new_combo: int) -> void:
 	if new_combo < 3:
 		_combo_label.modulate.a = 0.0
+		_combo_label.scale = Vector2.ONE
 		return
-	_combo_label.text = "x%d COMBO!" % new_combo
+
+	# Scale text size and color with combo intensity
+	var font_size := 38 + mini((new_combo - 3) * 3, 28)  # 38 at x3 → 66 at x13+
+	_combo_label.add_theme_font_size_override("font_size", font_size)
+
+	# Color: white → gold → orange → red as combo grows
+	var combo_color: Color
+	if new_combo < 6:
+		combo_color = Color.WHITE.lerp(Color(1.0, 0.85, 0.2), float(new_combo - 3) / 3.0)
+	elif new_combo < 10:
+		combo_color = Color(1.0, 0.85, 0.2).lerp(Color(1.0, 0.45, 0.1), float(new_combo - 6) / 4.0)
+	else:
+		combo_color = Color(1.0, 0.45, 0.1).lerp(Color(1.0, 0.1, 0.1), minf(float(new_combo - 10) / 5.0, 1.0))
+	_combo_label.add_theme_color_override("font_color", combo_color)
+
+	_combo_label.text = "x%d" % new_combo if new_combo >= 10 else "x%d  COMBO" % new_combo
+
 	if is_instance_valid(_combo_tween):
 		_combo_tween.kill()
+
+	# Pop scale punch on each new combo hit
+	_combo_label.scale = Vector2(1.35, 1.35)
 	_combo_tween = _combo_label.create_tween()
-	_combo_tween.tween_property(_combo_label, "modulate:a", 1.0, 0.1)
-	_combo_tween.tween_interval(0.65)
-	_combo_tween.tween_property(_combo_label, "modulate:a", 0.0, 0.35)
+	_combo_tween.set_ease(Tween.EASE_OUT)
+	_combo_tween.set_trans(Tween.TRANS_BACK)
+	_combo_tween.tween_property(_combo_label, "scale", Vector2.ONE, 0.18)
+	_combo_tween.tween_property(_combo_label, "modulate:a", 1.0, 0.0)
+	_combo_tween.tween_interval(0.5 + minf(float(new_combo) * 0.04, 0.4))
+	_combo_tween.tween_property(_combo_label, "modulate:a", 0.0, 0.3)
 
 func _on_level_up(new_level: int) -> void:
 	_level_label.text = "LVL %d" % (new_level + 1)
-	var tw := _level_label.create_tween()
-	tw.tween_property(_level_label, "modulate", Color(1.0, 0.85, 0.25), 0.15)
-	tw.tween_property(_level_label, "modulate", Color(1.0, 1.0, 1.0), 0.5)
+	var ltw := _level_label.create_tween()
+	ltw.tween_property(_level_label, "modulate", Color(1.0, 0.85, 0.25), 0.12)
+	ltw.tween_property(_level_label, "scale", Vector2(1.3, 1.3), 0.08)
+	ltw.tween_property(_level_label, "scale", Vector2(1.0, 1.0), 0.2)
+	ltw.tween_property(_level_label, "modulate", Color(1.0, 1.0, 1.0), 0.5)
 
-	_level_banner.text = "LEVEL %d" % (new_level + 1)
+	# Full banner with speed info
+	_level_banner.text = "LEVEL  %d" % (new_level + 1)
+	_level_banner.add_theme_font_size_override("font_size", 32)
+	_level_banner.add_theme_color_override("font_color", Color(1.0, 0.85, 0.25))
+
 	if is_instance_valid(_combo_tween):
 		_combo_tween.kill()
+
+	# Scale punch in, hold, fade out
+	_level_banner.scale = Vector2(0.6, 0.6)
+	_level_banner.modulate.a = 0.0
 	var btw := _level_banner.create_tween()
-	btw.tween_property(_level_banner, "modulate:a", 1.0, 0.15)
-	btw.tween_property(_level_banner, "scale", Vector2(1.12, 1.12), 0.12)
-	btw.tween_property(_level_banner, "scale", Vector2(1.0, 1.0), 0.12)
-	btw.tween_interval(0.8)
+	btw.set_ease(Tween.EASE_OUT)
+	btw.set_trans(Tween.TRANS_BACK)
+	btw.tween_property(_level_banner, "scale", Vector2.ONE, 0.22)
+	btw.parallel().tween_property(_level_banner, "modulate:a", 1.0, 0.12)
+	btw.tween_interval(1.1)
 	btw.tween_property(_level_banner, "modulate:a", 0.0, 0.4)

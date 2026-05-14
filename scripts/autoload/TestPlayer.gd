@@ -28,6 +28,14 @@ func _process(delta: float) -> void:
 	_t            += delta
 	_think_timer  += delta
 
+	# Dismiss title screen on first frame
+	if _t < 0.2 and not GameState.is_running:
+		var titles := get_tree().get_nodes_in_group("title_screen")
+		if titles.is_empty():
+			GameState.is_running = true
+		else:
+			titles[0]._on_play()
+
 	for st in SHOT_TIMES:
 		if not _shots_done.has(st) and _t >= st:
 			_shots_done[st] = true

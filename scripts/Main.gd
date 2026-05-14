@@ -17,9 +17,10 @@ var _gameover:Node
 var _camera:  Camera2D
 var _audio:   Node
 var _bg:      Node2D
+var _title:   Node
 
-var _spawn_timers:  Array[float] = []
-var _pending_spawn: Array[bool]  = []
+var _spawn_timers:    Array[float] = []
+var _active_per_lane: Array[int]  = []   # how many items currently in-flight per lane
 
 var _last_tap_pos  := Vector2(-999.0, -999.0)
 var _last_tap_time := -1.0
@@ -29,8 +30,9 @@ const GateScript       := preload("res://scripts/Gate.gd")
 const BinScript        := preload("res://scripts/Bin.gd")
 const HUDScript        := preload("res://scripts/HUD.gd")
 const GameOverScript   := preload("res://scripts/GameOver.gd")
-const BackgroundScript := preload("res://scripts/Background.gd")
-const AudioScript      := preload("res://scripts/Audio.gd")
+const BackgroundScript  := preload("res://scripts/Background.gd")
+const AudioScript       := preload("res://scripts/Audio.gd")
+const TitleScript       := preload("res://scripts/TitleScreen.gd")
 
 func _ready() -> void:
 	_setup_camera()
@@ -42,10 +44,20 @@ func _ready() -> void:
 	_build_hud()
 	_build_gameover()
 	_connect_signals()
-	_init_spawn_timers()
 	set_process_input(true)
 	_audio = AudioScript.new()
 	add_child(_audio)
+	# Show title screen — spawning starts only after play is tapped
+	_title = TitleScript.new()
+	add_child(_title)
+	_title.play_requested.connect(_on_title_play)
+	# Don't init spawn timers yet — wait for title dismiss
+	GameState.is_running = false
+
+func _on_title_play() -> void:
+	GameState.is_running = true
+	_active_per_lane.clear()
+	_init_spawn_timers()
 
 # ================================================================
 #  INPUT
@@ -180,19 +192,38 @@ func _connect_signals() -> void:
 
 func _init_spawn_timers() -> void:
 	_spawn_timers.clear()
-	_pending_spawn.clear()
+	_active_per_lane.clear()
 	for i in range(GameState.lane_count):
+		# Stagger initial spawns across lanes
 		_spawn_timers.append(float(i) * (GameState.spawn_interval / float(GameState.lane_count)))
-		_pending_spawn.append(false)
+		_active_per_lane.append(0)
 
 func _process(delta: float) -> void:
+	_update_background()
 	if not GameState.is_running:
 		return
 	for i in range(_spawn_timers.size()):
 		_spawn_timers[i] -= delta
-		if _spawn_timers[i] <= 0.0 and not _pending_spawn[i]:
-			_pending_spawn[i] = true
+		var active := _active_per_lane[i] if i < _active_per_lane.size() else 0
+		if _spawn_timers[i] <= 0.0 and active < GameState.max_per_lane:
 			_spawn_item(i)
+			_spawn_timers[i] = GameState.spawn_interval
+
+func _update_background() -> void:
+	if not is_instance_valid(_bg):
+		return
+	var bg := _bg as Background
+	if bg == null:
+		return
+	# Combo heat: 0 at combo<3, rises to 1 at combo 12+
+	bg.combo_heat  = clampf(float(maxi(GameState.combo - 3, 0)) / 9.0, 0.0, 1.0)
+	# Danger heat: max bin pressure above 0.6
+	var max_p := 0.0
+	for b in _bins:
+		max_p = maxf(max_p, b.pressure)
+	bg.danger_heat = clampf((max_p - 0.6) / 0.4, 0.0, 1.0)
+	# Level speed: 1.0 at level 0, up to 2.5 at level 8
+	bg.level_speed = 1.0 + float(GameState.level) * 0.19
 
 func _spawn_item(lane_idx: int) -> void:
 	var n      := GameState.lane_count
@@ -226,6 +257,8 @@ func _spawn_item(lane_idx: int) -> void:
 	item.reached_bin.connect(_on_item_reached_bin)
 	_items.add_child(item)
 	item.add_to_group("flow_items")
+	if lane_idx < _active_per_lane.size():
+		_active_per_lane[lane_idx] += 1
 
 # ================================================================
 #  ROUTING
@@ -279,13 +312,9 @@ func _on_item_reached_bin(item: FlowItem, bin_idx: int) -> void:
 	var timer := get_tree().create_timer(0.18)
 	timer.timeout.connect(item.queue_free)
 
-	if lane_idx < _spawn_timers.size():
-		# RUSH spawns next item faster
-		var interval := GameState.spawn_interval
-		if item.item_type == FlowItem.Type.RUSH:
-			interval *= 0.5
-		_spawn_timers[lane_idx]  = interval
-		_pending_spawn[lane_idx] = false
+	# Decrement active count so new spawns can happen
+	if lane_idx < _active_per_lane.size():
+		_active_per_lane[lane_idx] = maxi(_active_per_lane[lane_idx] - 1, 0)
 
 	_update_gate_glow()
 
@@ -346,10 +375,10 @@ func _on_restart() -> void:
 		c.queue_free()
 	GameState.start_game()
 	_on_bins_shuffled()
-	# Reset bin pressures
 	for b in _bins:
 		b.pressure    = 0.0
 		b.is_disabled = false
 		b.queue_redraw()
 	queue_redraw()
+	_active_per_lane.fill(0)
 	_init_spawn_timers()

@@ -19,6 +19,7 @@ var is_running: bool  = false
 var fall_speed:     float = 220.0
 var spawn_interval: float = 1.6
 var lane_count:     int   = 3
+var max_per_lane:   int   = 1   # simultaneous items per lane; scales with level
 
 # --- Bin color layout ---
 var bin_color_ids: Array[int] = []
@@ -35,11 +36,12 @@ const SPAWN_WEIGHTS_BY_LEVEL := [
 
 const LEVEL_THRESHOLDS := {
 	1: {"fall_speed": 260.0, "spawn_interval": 1.5},
-	2: {"fall_speed": 300.0, "spawn_interval": 1.35},
+	2: {"fall_speed": 300.0, "spawn_interval": 1.35, "max_per_lane": 2},
 	3: {"fall_speed": 350.0, "spawn_interval": 1.2},
 	4: {"fall_speed": 400.0, "spawn_interval": 1.05, "lane_count": 4},
-	6: {"fall_speed": 460.0, "spawn_interval": 0.9},
-	8: {"fall_speed": 520.0, "spawn_interval": 0.78, "lane_count": 5},
+	5: {"fall_speed": 440.0, "spawn_interval": 0.95, "max_per_lane": 3},
+	6: {"fall_speed": 460.0, "spawn_interval": 0.85},
+	8: {"fall_speed": 520.0, "spawn_interval": 0.72, "lane_count": 5},
 }
 
 const SECONDS_PER_LEVEL: float = 30.0
@@ -54,6 +56,7 @@ func start_game() -> void:
 	fall_speed     = 220.0
 	spawn_interval = 1.6
 	lane_count     = 3
+	max_per_lane   = 1
 	_level_timer   = 0.0
 	_assign_bin_colors()
 	score_changed.emit(score)
@@ -75,6 +78,7 @@ func _advance_level() -> void:
 		if t.has("fall_speed"):     fall_speed     = t["fall_speed"]
 		if t.has("spawn_interval"): spawn_interval = t["spawn_interval"]
 		if t.has("lane_count"):     lane_count     = t["lane_count"]
+		if t.has("max_per_lane"):   max_per_lane   = t["max_per_lane"]
 	_assign_bin_colors()
 	level_up.emit(level)
 	bins_shuffled.emit()
