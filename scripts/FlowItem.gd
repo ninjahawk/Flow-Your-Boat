@@ -63,19 +63,23 @@ func _build_visual() -> void:
 	add_child(_visual)
 
 func _build_trail() -> void:
+	# Trail is added to the SCENE ROOT (not as a child) so it keeps
+	# world positions while the item moves. We free it when item exits.
 	_trail = Line2D.new()
-	_trail.width            = 5.0
-	_trail.width_curve      = _make_taper_curve()
-	_trail.begin_cap_mode   = Line2D.LINE_CAP_ROUND
-	_trail.end_cap_mode     = Line2D.LINE_CAP_ROUND
-	_trail.z_index          = -1
+	_trail.width          = 6.0
+	_trail.width_curve    = _make_taper_curve()
+	_trail.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	_trail.end_cap_mode   = Line2D.LINE_CAP_ROUND
+	_trail.z_index        = 7   # just below items (z=10)
 
 	var col := Palette.ITEM_COLORS[color_id]
 	var grad := Gradient.new()
 	grad.set_color(0, Color(col.r, col.g, col.b, 0.0))
-	grad.set_color(1, Color(col.r, col.g, col.b, 0.50))
+	grad.set_color(1, Color(col.r, col.g, col.b, 0.55))
 	_trail.gradient = grad
-	add_child(_trail)
+
+	# Add directly to the scene so points are in world space
+	get_tree().current_scene.add_child(_trail)
 
 func _make_taper_curve() -> Curve:
 	var c := Curve.new()
@@ -122,15 +126,16 @@ func _process(delta: float) -> void:
 				reached_bin.emit(self, _target_bin_idx)
 
 func _update_trail() -> void:
-	if _state == 2:
+	if _state == 2 or not is_instance_valid(_trail):
 		return
+	var world_pos := global_position
 	var pts := _trail.get_point_count()
 	if pts == 0:
-		_trail.add_point(Vector2.ZERO)
+		_trail.add_point(world_pos)
 		return
 	var last: Vector2 = _trail.get_point_position(pts - 1)
-	if Vector2.ZERO.distance_to(last) >= TRAIL_GAP:
-		_trail.add_point(Vector2.ZERO)  # local — trails behind in parent space
+	if world_pos.distance_to(last) >= TRAIL_GAP:
+		_trail.add_point(world_pos)
 		if _trail.get_point_count() > TRAIL_LEN:
 			_trail.remove_point(0)
 
@@ -164,6 +169,13 @@ func play_fail() -> void:
 
 func _ease_out(t: float) -> float:
 	return 1.0 - pow(1.0 - t, 3.0)
+
+func _exit_tree() -> void:
+	if is_instance_valid(_trail):
+		# Fade trail out rather than hard-removing
+		var tw := _trail.create_tween()
+		tw.tween_property(_trail, "modulate:a", 0.0, 0.2)
+		tw.tween_callback(_trail.queue_free)
 
 func get_item_type_name() -> String:
 	match item_type:

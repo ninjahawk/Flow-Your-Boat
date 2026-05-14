@@ -46,8 +46,23 @@ func _toggle() -> void:
 	_mat.set_shader_parameter("direction", float(direction))
 	_mat.set_shader_parameter("flip_t",    1.0)
 	toggled.emit(self)
+	_tap_flash()
 	if OS.get_name() == "Android":
 		Input.vibrate_handheld(28)
+
+func _tap_flash() -> void:
+	# Bright white overlay that decays in 0.12s
+	var flash := ColorRect.new()
+	flash.size     = Vector2(gate_width, gate_height)
+	flash.position = Vector2(-gate_width * 0.5, -gate_height * 0.5)
+	flash.color    = Color(1.0, 1.0, 1.0, 0.55)
+	flash.z_index  = 10
+	add_child(flash)
+	var tw := flash.create_tween()
+	tw.tween_property(flash, "color:a", 0.0, 0.14)
+	tw.tween_callback(flash.queue_free)
+	# Tiny spark burst at gate center
+	Effects.burst_at(global_position, Color(0.75, 0.82, 1.0), 8)
 
 func set_active(active: bool) -> void:
 	if _is_active == active:

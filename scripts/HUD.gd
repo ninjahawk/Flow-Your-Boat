@@ -20,6 +20,7 @@ func _ready() -> void:
 	GameState.lives_changed.connect(_on_lives_changed)
 	GameState.combo_changed.connect(_on_combo_changed)
 	GameState.level_up.connect(_on_level_up)
+	GameState.score_milestone.connect(_on_score_milestone)
 
 func _build_ui() -> void:
 	_root = Control.new()
@@ -167,6 +168,28 @@ func _on_combo_changed(new_combo: int) -> void:
 	_combo_tween.tween_property(_combo_label, "modulate:a", 1.0, 0.0)
 	_combo_tween.tween_interval(0.5 + minf(float(new_combo) * 0.04, 0.4))
 	_combo_tween.tween_property(_combo_label, "modulate:a", 0.0, 0.3)
+
+func _on_score_milestone(threshold: int) -> void:
+	# Burst the score label + brief screen flash
+	var tw := _score_label.create_tween()
+	tw.set_ease(Tween.EASE_OUT)
+	tw.set_trans(Tween.TRANS_BACK)
+	tw.tween_property(_score_label, "scale", Vector2(1.6, 1.6), 0.10)
+	tw.tween_property(_score_label, "scale", Vector2(1.0, 1.0), 0.22)
+
+	# Milestone text flash (reuse level banner node)
+	_level_banner.text = "★ %d ★" % threshold
+	_level_banner.add_theme_font_size_override("font_size", 26)
+	_level_banner.add_theme_color_override("font_color", Color(1.0, 0.85, 0.25))
+	_level_banner.scale = Vector2(0.5, 0.5)
+	_level_banner.modulate.a = 0.0
+	var btw := _level_banner.create_tween()
+	btw.set_ease(Tween.EASE_OUT)
+	btw.set_trans(Tween.TRANS_BACK)
+	btw.tween_property(_level_banner, "scale", Vector2.ONE, 0.18)
+	btw.parallel().tween_property(_level_banner, "modulate:a", 1.0, 0.10)
+	btw.tween_interval(0.6)
+	btw.tween_property(_level_banner, "modulate:a", 0.0, 0.3)
 
 func _on_level_up(new_level: int) -> void:
 	_level_label.text = "LVL %d" % (new_level + 1)

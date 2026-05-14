@@ -7,6 +7,7 @@ signal level_up(new_level: int)
 signal game_over
 signal bins_shuffled
 signal bin_overflowed(bin_index: int)
+signal score_milestone(threshold: int)
 
 # --- Game state ---
 var score:      int   = 0
@@ -48,16 +49,17 @@ const SECONDS_PER_LEVEL: float = 30.0
 var _level_timer: float = 0.0
 
 func start_game() -> void:
-	score          = 0
-	lives          = 3
-	combo          = 0
-	level          = 0
-	is_running     = true
-	fall_speed     = 220.0
-	spawn_interval = 1.6
-	lane_count     = 3
-	max_per_lane   = 1
-	_level_timer   = 0.0
+	score                = 0
+	lives                = 3
+	combo                = 0
+	level                = 0
+	is_running           = true
+	fall_speed           = 220.0
+	spawn_interval       = 1.6
+	lane_count           = 3
+	max_per_lane         = 1
+	_level_timer         = 0.0
+	_next_milestone_idx  = 0
 	_assign_bin_colors()
 	score_changed.emit(score)
 	lives_changed.emit(lives)
@@ -117,9 +119,17 @@ func roll_item_type(bin_pressures: Array) -> int:
 	acc += int(weights[2]); if roll < acc: return 2
 	return 3
 
+const MILESTONES := [100, 250, 500, 1000, 2500, 5000, 10000]
+var _next_milestone_idx: int = 0
+
 func add_score(points: int) -> void:
+	var prev := score
 	score += points
 	score_changed.emit(score)
+	# Check milestones
+	while _next_milestone_idx < MILESTONES.size() and score >= MILESTONES[_next_milestone_idx]:
+		score_milestone.emit(MILESTONES[_next_milestone_idx])
+		_next_milestone_idx += 1
 
 func increment_combo() -> void:
 	combo += 1
