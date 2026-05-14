@@ -39,6 +39,9 @@ void fragment() {
 
     // ---- Base color assembly ----
     vec3 col = item_color.rgb;
+    // Vertical gradient: top slightly lighter, bottom darker (depth)
+    float vert_grad = 1.0 + (0.5 - UV.y) * 0.22;
+    col *= vert_grad;
     col = mix(col, min(col * 2.2 + 0.15, vec3(1.0)), rim * 0.65);
     col += vec3(highlight);
     col -= vec3(shadow * 0.3);

@@ -31,8 +31,8 @@ var _trail_pts: int = 0
 
 const ITEM_SIZE  := Vector2(72.0, 62.0)
 const CORNER_R   := 12.0
-const TRAIL_LEN  := 10
-const TRAIL_GAP  := 8.0   # pixels between trail points
+const TRAIL_LEN  := 16
+const TRAIL_GAP  := 5.0
 
 const ITEM_SHADER := preload("res://shaders/item.gdshader")
 
@@ -63,22 +63,21 @@ func _build_visual() -> void:
 	add_child(_visual)
 
 func _build_trail() -> void:
-	# Trail is added to the SCENE ROOT (not as a child) so it keeps
-	# world positions while the item moves. We free it when item exits.
 	_trail = Line2D.new()
-	_trail.width          = 6.0
+	_trail.width          = 10.0 + float(item_type) * 3.0  # RUSH = wider trail
 	_trail.width_curve    = _make_taper_curve()
 	_trail.begin_cap_mode = Line2D.LINE_CAP_ROUND
 	_trail.end_cap_mode   = Line2D.LINE_CAP_ROUND
-	_trail.z_index        = 7   # just below items (z=10)
+	_trail.z_index        = 7
 
 	var col := Palette.ITEM_COLORS[color_id]
+	var glow := Palette.GLOW_COLORS[color_id]
 	var grad := Gradient.new()
 	grad.set_color(0, Color(col.r, col.g, col.b, 0.0))
-	grad.set_color(1, Color(col.r, col.g, col.b, 0.55))
+	grad.add_point(0.5, Color(col.r, col.g, col.b, 0.15))
+	grad.set_color(1, Color(glow.r, glow.g, glow.b, 0.65))
 	_trail.gradient = grad
 
-	# Add directly to the scene so points are in world space
 	get_tree().current_scene.add_child(_trail)
 
 func _make_taper_curve() -> Curve:

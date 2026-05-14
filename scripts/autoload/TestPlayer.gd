@@ -63,44 +63,39 @@ func _play_smart() -> void:
 	if gates.is_empty() or bins.is_empty():
 		return
 
-	# Build a color→bin_index map
 	var color_to_bin := {}
 	for b in bins:
 		color_to_bin[b.color_id] = b.bin_index
 
-	# For each falling item, determine the correct gate direction
+	# For each lane, find the item CLOSEST to the gate (highest Y, state=0)
+	# and set the gate for that item only. Ignores items higher up.
+	var closest_per_lane := {}  # lane_idx → item with highest y
 	for child in items:
 		var item := child as FlowItem
-		if not is_instance_valid(item):
-			continue
-		# Only act when item is above the gate (state 0 = falling)
-		if item.get("_state") != 0:
-			continue
-		var lane_idx: int = item.lane_index
-		if lane_idx >= gates.size():
-			continue
+		if not is_instance_valid(item): continue
+		if item.get("_state") != 0: continue
+		var li: int = item.lane_index
+		if not closest_per_lane.has(li) or item.position.y > closest_per_lane[li].position.y:
+			closest_per_lane[li] = item
 
+	for li in closest_per_lane:
+		var item := closest_per_lane[li] as FlowItem
+		if li >= gates.size(): continue
 		var gate: Gate = null
 		for g in gates:
-			if g.lane_index == lane_idx:
-				gate = g
-				break
-		if gate == null:
-			continue
+			if g.lane_index == li: gate = g; break
+		if gate == null: continue
 
 		var item_color: int = item.color_id
-		# Correct direction: LEFT (-1) → bin[lane_idx], RIGHT (+1) → bin[lane_idx+1]
 		var correct_dir: int = -1
 		if color_to_bin.has(item_color):
-			var target_bin_idx: int = color_to_bin[item_color]
-			if target_bin_idx == lane_idx + 1:
-				correct_dir = 1
-			# else correct_dir stays -1 (left)
+			var target: int = color_to_bin[item_color]
+			if target == li + 1: correct_dir = 1
 
 		if gate.direction != correct_dir:
 			_simulate_click_on(gate)
 			_log.append("t=%.1f SMART: gate[%d] set to %s for color %d" % [
-				_t, lane_idx, ("R" if correct_dir == 1 else "L"), item_color
+				_t, li, ("R" if correct_dir == 1 else "L"), item_color
 			])
 
 # ----------------------------------------------------------------
