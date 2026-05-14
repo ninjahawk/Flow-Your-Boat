@@ -82,7 +82,7 @@ func _play_smart() -> void:
 
 		var item_color: int = item.color_id
 		# Correct direction: LEFT (-1) → bin[lane_idx], RIGHT (+1) → bin[lane_idx+1]
-		var correct_dir := -1
+		var correct_dir: int = -1
 		if color_to_bin.has(item_color):
 			var target_bin_idx: int = color_to_bin[item_color]
 			if target_bin_idx == lane_idx + 1:
