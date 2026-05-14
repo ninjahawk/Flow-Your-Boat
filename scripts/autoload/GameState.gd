@@ -16,6 +16,11 @@ var combo:      int   = 0
 var level:      int   = 0
 var is_running: bool  = false
 
+# --- Run stats (reset each game) ---
+var max_combo:      int = 0
+var total_sorted:   int = 0
+var correct_sorted: int = 0
+
 # --- Difficulty ---
 var fall_speed:     float = 220.0
 var spawn_interval: float = 1.6
@@ -60,6 +65,9 @@ func start_game() -> void:
 	max_per_lane         = 1
 	_level_timer         = 0.0
 	_next_milestone_idx  = 0
+	max_combo            = 0
+	total_sorted         = 0
+	correct_sorted       = 0
 	_assign_bin_colors()
 	score_changed.emit(score)
 	lives_changed.emit(lives)
@@ -134,9 +142,15 @@ func add_score(points: int) -> void:
 
 func increment_combo() -> void:
 	combo += 1
+	if combo > max_combo:
+		max_combo = combo
+	correct_sorted += 1
+	total_sorted   += 1
 	combo_changed.emit(combo)
 
 func reset_combo() -> void:
+	if combo > 0:
+		total_sorted += 1   # the miss itself
 	combo = 0
 	combo_changed.emit(combo)
 
