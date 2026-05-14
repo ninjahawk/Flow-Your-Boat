@@ -7,7 +7,8 @@ uniform float approach    = 0.0;   // 0-1: brightens as item nears gate
 uniform float flash       = 0.0;   // 0-1: white/red pulse on success/fail
 uniform float flash_ok    = 1.0;   // 1=success white, 0=fail red
 uniform float item_type   = 0.0;   // 0=normal 1=rush 2=bomb 3=drain
-uniform float spawn_scale = 1.0;   // 0→1 spawn pop-in (driven by node scale)
+uniform float spawn_scale = 1.0;
+uniform float type_pulse  = 0.0;   // 0-1: secondary animated ring for special types
 
 // Signed distance: rounded box centered at origin
 float sd_rbox(vec2 p, vec2 b, float r) {
@@ -81,6 +82,14 @@ void fragment() {
     // ---- Flash overlay (success=white, fail=red) ----
     vec3 flash_col = mix(vec3(1.0, 0.1, 0.1), vec3(1.0), flash_ok);
     col = mix(col, flash_col, flash * 0.75);
+
+    // ---- Type indicator ring (for RUSH/BOMB/DRAIN) ----
+    if (item_type > 0.5) {
+        float ring_r = length(px / (half * 1.1));
+        float ring   = smoothstep(0.07, 0.0, abs(ring_r - 1.0));
+        float pulse  = sin(TIME * 6.0 + item_type * 2.0) * 0.4 + 0.6;
+        col = mix(col, vec3(1.0), ring * pulse * 0.4 * shape);
+    }
 
     float a = clamp(shape + outer_glow, 0.0, 1.0);
     COLOR = vec4(col, a);
