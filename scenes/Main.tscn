@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3 uid="uid://flowsorter_main"]
+
+[ext_resource type="Script" path="res://scripts/Main.gd" id="1_mainscript"]
+
+[node name="Main" type="Node2D"]
+script = ExtResource("1_mainscript")
+
+[node name="Camera2D" type="Camera2D" parent="."]
